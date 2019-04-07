@@ -1,10 +1,9 @@
-// LoRa 9x_TX
-// -*- mode: C++ -*-
-// Example sketch showing how to create a simple messaging client (transmitter)
-// with the RH_RF95 class. RH_RF95 class does not provide for addressing or
-// reliability, so you should only use RH_RF95 if you do not need the higher
-// level messaging abilities.
-// It is designed to work with the other example LoRa9x_RX
+/*
+ * MOSI (DI) - 8
+ * MISO (DO) - 7
+ * CLK (SCK) - 14
+ * CS - 15
+ */
  
 #include <SPI.h>
 #include <RH_RF95.h>
@@ -19,6 +18,8 @@
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
+const int chipSelect = 15;
+
 struct data {
   double alt;
   double vertical_velocity;
@@ -31,6 +32,10 @@ data datapacket = {5.0, 4.0, 3.0, 2.0, 1.0};
  
 void setup() 
 {
+  pinMode(10, OUTPUT);
+  pinMode(chipSelect, OUTPUT);
+  File dataFile = SD.open("datalog.txt", FILE_WRITE);
+  
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
   pinMode(RFM95_INT, INPUT);
@@ -71,7 +76,7 @@ void setup()
 int16_t packetnum = 0;  // packet counter, we increment per xmission
  
 void loop()
-{
+{  
   Serial.println("Sending to rf95_server");
   // Send a message to rf95_server
 
@@ -82,31 +87,10 @@ void loop()
  
   Serial.println("Waiting for packet to complete..."); delay(10);
   rf95.waitPacketSent();
-  // Now wait for a reply
-  uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-  uint8_t len = sizeof(buf);
  
-  Serial.println("Waiting for reply..."); delay(10);
-  if (rf95.waitAvailableTimeout(1000))
-  { 
-    // Should be a reply message for us now   
-    if (rf95.recv(buf, &len))
-   {
-      Serial.print("Got reply: ");
-      Serial.println((char*)buf);
-      Serial.print("RSSI: ");
-      Serial.println(rf95.lastRssi(), DEC);    
-    }
-    else
-    {
-      Serial.println("Receive failed");
-    }
-  }
-  else
-  {
-    Serial.println("No reply, is there a listener around?");
-  }
-  //delay(1000);
+  Serial.println("Writing data to file");
+  
+  dataFile.println(toString(datapacket));
 }
 
 String toString(data datapacket) {

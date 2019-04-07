@@ -1,10 +1,10 @@
-// Arduino9x_RX
-// -*- mode: C++ -*-
-// Example sketch showing how to create a simple messaging client (receiver)
-// with the RH_RF95 class. RH_RF95 class does not provide for addressing or
-// reliability, so you should only use RH_RF95 if you do not need the higher
-// level messaging abilities.
-// It is designed to work with the other example Arduino9x_TX
+/*
+ * 
+ * MOSI (DI) - 0
+ * MISO (DO) - 1
+ * CLK (SCK) - 20
+ * CS - 6
+ */
  
 #include <SPI.h>
 #include <RH_RF95.h>
@@ -21,9 +21,20 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
  
 // Blinky on receipt
 #define LED 13
- 
+
+struct data {
+  double alt;
+  double vertical_velocity;
+  double horizontal_velocity;
+  double vertical_acceleration;
+  double horizontal_acceleration;
+};
+
+data datapacket = {0.0, 0.0, 0.0, 0.0, 0.0};
+
 void setup() 
 {
+  
   pinMode(LED, OUTPUT);     
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
@@ -64,31 +75,19 @@ void setup()
 int16_t packetnum = 0;  // packet counter, we increment per xmission
 void loop()
 {
-  Serial.println("Sending to rf95_server");
-  // Send a message to rf95_server
-    
-  char radiopacket[20] = "Hello World #      ";
-  itoa(packetnum++, radiopacket+13, 10);
-  Serial.print("Sending "); Serial.println(radiopacket);
-  radiopacket[19] = 0;
+  Serial.println("Waiting to receive");
   
-  Serial.println("Sending..."); delay(10);
-  rf95.send((uint8_t *)radiopacket, 20);
- 
-  Serial.println("Waiting for packet to complete..."); delay(10);
-  rf95.waitPacketSent();
   // Now wait for a reply
   uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-  uint8_t len = sizeof(buf);
+  uint8_t len = sizeof(datapacket);
  
-  Serial.println("Waiting for reply..."); delay(10);
   if (rf95.waitAvailableTimeout(1000))
   { 
     // Should be a reply message for us now   
-    if (rf95.recv(buf, &len))
+    if (rf95.recv((uint8_t*)&datapacket, &len))
    {
       Serial.print("Got reply: ");
-      Serial.println((char*)buf);
+      Serial.println(toString(datapacket));
       Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC);    
     }
@@ -102,4 +101,13 @@ void loop()
     Serial.println("No reply, is there a listener around?");
   }
   delay(1000);
+}
+
+String toString(data datapacket) {
+  String dataString = "Altitude: " + String(datapacket.alt)
+    + ".  Vertical Velocity: " + String(datapacket.vertical_velocity) 
+    + ".  Horizontal Velocity: " + String(datapacket.horizontal_velocity) 
+    + ".  Vertical Acceleration: " + String(datapacket.vertical_acceleration)
+    + ".  Horizontal Acceleration: " + String(datapacket.horizontal_acceleration);
+  return dataString;
 }
