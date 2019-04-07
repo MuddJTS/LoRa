@@ -6,14 +6,18 @@
  */
  
 #include <SPI.h>
+#include <SD.h>
+#include "SdFat.h"
 #include <RH_RF95.h>
  
-#define RFM95_CS 10
+#define RFM95_CS 8
 #define RFM95_RST 9
 #define RFM95_INT 2
  
 // Change to 434.0 or other frequency, must match RX's freq!
 #define RF95_FREQ 915.0
+
+#define FILE_BASE_NAME "Data"
  
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
@@ -29,12 +33,14 @@ struct data {
 };
 
 data datapacket = {5.0, 4.0, 3.0, 2.0, 1.0};
- 
+
+File dataFile;
+
 void setup() 
 {
-  pinMode(10, OUTPUT);
-  pinMode(chipSelect, OUTPUT);
-  File dataFile = SD.open("datalog.txt", FILE_WRITE);
+  //const uint8_t BASE_NAME_SIZE = sizeof(FILE_BASE_NAME) - 1;
+  
+  //pinMode(chipSelect, OUTPUT);
   
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
@@ -57,7 +63,7 @@ void setup()
     while (1);
   }
   Serial.println("LoRa radio init OK!");
- 
+
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
   if (!rf95.setFrequency(RF95_FREQ)) {
     Serial.println("setFrequency failed");
@@ -71,12 +77,29 @@ void setup()
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
   // you can set transmitter powers from 5 to 23 dBm:
   rf95.setTxPower(5, false);
+
+
+  /*while (sd.exists(fileName)) {
+    if (fileName[BASE_NAME_SIZE + 1] != '9') {
+      fileName[BASE_NAME_SIZE + 1]++;
+    } else if (fileName[BASE_NAME_SIZE] != '9') {
+      fileName[BASE_NAME_SIZE + 1] = '0';
+      fileName[BASE_NAME_SIZE]++;
+    } else {
+      error("Can't create file name");
+    }
+  }
+  
+  if (!file.open(fileName, O_WRONLY | O_CREAT | O_EXCL)) {
+    error("file.open");
+  }*/
 }
  
 int16_t packetnum = 0;  // packet counter, we increment per xmission
  
 void loop()
 {  
+  
   Serial.println("Sending to rf95_server");
   // Send a message to rf95_server
 
@@ -89,8 +112,16 @@ void loop()
   rf95.waitPacketSent();
  
   Serial.println("Writing data to file");
-  
-  dataFile.println(toString(datapacket));
+
+  // if the file is available, write to it:
+  if (dataFile) {
+    dataFile.println(toString(datapacket));
+    Serial.println("Completed write to file");
+  }
+  // if the file isn't open, pop up an error:
+  else {
+    Serial.println("error opening datalog.txt");
+  }
 }
 
 String toString(data datapacket) {
