@@ -74,7 +74,8 @@ void logData() {
     data[i] = analogRead(i);
   }
   // Write data to file.  Start with log time in micros.
-  file.print(toString(datapacket));
+  //file.print(toString(datapacket));
+  file.print((uint8_t *)&datapacket, sizeof(datapacket));
 
   // Write ADC data to CSV record.
   for (uint8_t i = 0; i < ANALOG_COUNT; i++) {
@@ -123,21 +124,10 @@ void setup() {
 
   const uint8_t BASE_NAME_SIZE = sizeof(FILE_BASE_NAME) - 1;
   char fileName[13] = FILE_BASE_NAME "00.csv";
-
-  // Wait for USB Serial 
-  while (!Serial) {
-    SysCall::yield();
-  }
-  delay(1000);
-
-  Serial.println(F("Type any character to start"));
-  while (!Serial.available()) {
-    SysCall::yield();
-  }
   
   // Initialize at the highest speed supported by the board that is
   // not over 50 MHz. Try a lower speed if SPI errors occur.
-  if (!sd.begin(chipSelect, SD_SCK_MHZ(50))) {
+  if (!sd.begin(chipSelect, SD_SCK_MHZ(10))) {
     sd.initErrorHalt();
   }
 
@@ -158,23 +148,17 @@ void setup() {
   if (!file.open(fileName, O_WRONLY | O_CREAT | O_EXCL)) {
     error("file.open");
   }
-
-  // Read any Serial data.
-  do {
-    delay(10);
-  } while (Serial.available() && Serial.read() >= 0);
-
+  
   Serial.print(F("Logging to: "));
   Serial.println(fileName);
-  Serial.println(F("Type any character to stop"));
-  
+
   // Write data header.
-  writeHeader();
+  writeHeader(); 
 
   // Start on a multiple of the sample interval.
   logTime = micros() / (1000UL * SAMPLE_INTERVAL_MS) + 1;
   logTime *= 1000UL * SAMPLE_INTERVAL_MS;
-
+  
 }
 
 //------------------------------------------------------------------------------
@@ -192,33 +176,12 @@ void loop() {
   rf95.waitPacketSent();
   //------------------------------------------------------------------
 
-  // Time for next record.
-  logTime += 1000UL * SAMPLE_INTERVAL_MS;
+    logData();
 
-  // Wait for log time.
-  int32_t diff;
-  do {
-    diff = micros() - logTime;
-  } while (diff < 0);
-
-  // Check for data rate too high.
-  if (diff > 10) {
-    error("Missed data record");
-  }
-
-  logData();
-
-  // Force data to SD and update the directory entry to avoid data loss.
-  if (!file.sync() || file.getWriteError()) {
+    // Force data to SD and update the directory entry to avoid data loss.
+    if (!file.sync() || file.getWriteError()) {
     error("write error");
-  }
-
-  if (Serial.available()) {
-    // Close file and stop.
-    file.close();
-    Serial.println(F("Done"));
-    SysCall::halt();
-  }
+    }
 }
 
 String toString(data datapacket) {
